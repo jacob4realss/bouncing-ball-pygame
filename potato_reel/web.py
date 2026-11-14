@@ -43,7 +43,9 @@ def build(out="output/potato_game.html", voice_dir="output/voices",
             "voice": _mp3_uri(voice_clip(ch, voice_dir)),
         })
     silence = _mp3_uri(np.zeros(int(SR * 0.3), dtype=np.float32))
+    from .physics import Tuning
     data = {"characters": chars, "half": HALF, "hook": hook, "silence": silence,
+            "dropRate": Tuning().drop_rate,
             "teaser": teaser or f"NOUVEAU : {CHARACTERS[-1].line}"}
     html = open(TEMPLATE, encoding="utf-8").read().replace("__POTATO_DATA__", json.dumps(data))
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)

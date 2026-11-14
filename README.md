@@ -74,28 +74,34 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 
 A potato merge game in two forms:
 
-- **A video reel** (1080×1920 MP4): a bot plays a real game from an empty ring,
-  aiming and dropping one potato at a time, until the last potato appears.
-- **A browser game** you play yourself: touch to aim, release to drop, with an Auto mode.
+- **A video reel** (1080×1920 MP4): potatoes rain in from the top at random spots
+  and times, bounce, and merge their way up to the last potato.
+- **A browser game** you play yourself: tap to drop, hold to keep dropping, or Auto.
 
-Two potatoes of the same kind merge into the next, bigger one, and every merge
-plays a French voice line, **« La patate … »**, pitched deeper the bigger the potato.
-You lose if the pile stays above the top of the ring.
+Only the smallest potato is ever dropped. Two potatoes of the same kind that touch
+merge into the next, bigger one, so every other character is made inside the ring.
+Every new potato is announced in French, **« La patate … »** (male voice "Henri"),
+deeper the bigger the potato. You lose if the pile stays above the top of the ring.
 
-| Tier | Voice line | Tier | Voice line | Tier | Voice line |
-|---|---|---|---|---|---|
-| 1 | La patate Bébé | 4 | La patate Chef | 7 | La patate Ninja |
-| 2 | La patate Douce | 5 | La patate Mamie | 8 | La patate Viking |
-| 3 | La patate Pirate | 6 | La patate Rappeur | 9 | La patate Royale |
+| Size | Voice line |
+|---|---|
+| 1 (dropped) | La patate Mahrez |
+| 2 | La patate Warda |
+| 3 | La patate Mexique |
+| 4 | La patate Belahcen |
+| 5 (the last one) | La patate Choucha |
+
+Each extra character doubles the potatoes needed: 5 characters make a ~20–35 s game,
+8 make about a minute, 9 about two minutes.
 
 ### Requirements
 - Python 3.9+ and `ffmpeg` on your PATH
 - `pip install -r requirements.txt`
-- Internet access the first time (voice lines come from Google's French TTS and are cached in `output/voices/`)
+- Internet access the first time (voice lines come from Microsoft's French voice "Henri" via `edge-tts`, falling back to Google TTS, and are cached in `output/voices/`)
 
 ### Make a reel
 ```bash
-python -m potato_reel                       # picks a game the bot wins in 55–85s
+python -m potato_reel                       # picks a game that reaches the last potato in 22–40s
 python -m potato_reel --seed 13 --out output/reel_13.mp4
 python -m potato_reel --min-len 45 --max-len 60
 python -m potato_reel --hook "Wait for the last potato" --teaser "NOUVEAU : La patate Royale"
@@ -113,6 +119,6 @@ The file is self-contained (art and voices embedded), so it works offline and on
 ### Customising
 - **Characters:** edit `CAST` in `potato_reel/characters.py` (name, skin colour, drawing style).
 - **Your own voice:** put recordings in `output/voices/` named `<tier>_<Name>.mp3` or `.wav`
-  (for example `9_Royale.mp3`, `1_Bebe.wav`; accents dropped from the file name). They replace the generated lines.
-- **Game rules:** `Tuning` in `potato_reel/physics.py` (gravity, which potatoes you get, cooldown).
+  (for example `5_Choucha.mp3`, `1_Mahrez.wav`; accents dropped from the file name). They replace the generated lines.
+- **Game rules:** `Tuning` in `potato_reel/physics.py` (gravity, bounciness, drop rate).
   The browser game has the same values at the top of its script in `potato_reel/web_template.html`.

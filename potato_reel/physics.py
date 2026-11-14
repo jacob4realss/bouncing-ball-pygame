@@ -55,6 +55,7 @@ class Tuning:
     grow_time: float = 0.14      # s for a merged potato to reach full size
     drop_speed: float = 700.0    # px/s downward when a potato enters at the top
     min_gap: float = 0.1         # s between two drops
+    drop_rate: float = 1.0       # average drops per second for the auto-dropper
     lose_time: float = 2.5       # s a potato may sit above the rim before game over
 
 

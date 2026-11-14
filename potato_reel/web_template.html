@@ -84,16 +84,16 @@ button.primary { background: var(--yellow); color: #14140c; border-color: var(--
 </style>
 
 <div id="stage">
-  <canvas id="game" width="1080" height="1920" aria-label="Plateau de jeu : touche pour lâcher une patate Bébé, garde le doigt appuyé pour en lâcher plusieurs"></canvas>
+  <canvas id="game" width="1080" height="1920" aria-label="Plateau de jeu : touche pour lâcher une patate, garde le doigt appuyé pour en lâcher plusieurs"></canvas>
   <div class="controls">
     <button id="btn-auto" type="button" aria-pressed="false">Auto</button>
     <button id="btn-sound" type="button" aria-pressed="true">Son</button>
     <button id="btn-restart" type="button">Rejouer</button>
   </div>
   <div class="overlay" id="ov-start">
-    <h1>La Patate Royale</h1>
+    <h1 id="start-title"></h1>
     <div class="ladder" id="ladder"></div>
-    <p>Touche l'écran pour lâcher une patate Bébé, garde le doigt appuyé pour en lâcher plein. <strong>Deux patates pareilles qui se touchent fusionnent</strong> en une plus grosse. Fais naître la patate Royale sans déborder du cercle.</p>
+    <p id="start-text"></p>
     <div class="row">
       <button class="primary" id="btn-play" type="button">Jouer</button>
       <button id="btn-watch" type="button">Regarder en auto</button>
@@ -108,7 +108,7 @@ button.primary { background: var(--yellow); color: #14140c; border-color: var(--
     <button class="primary" id="btn-again" type="button">Rejouer</button>
   </div>
   <div class="overlay" id="ov-win" hidden>
-    <h2>La patate Royale !</h2>
+    <h2 id="win-title"></h2>
     <div class="big" id="win-score"></div>
     <p>Tu as atteint la dernière patate. Continue pour battre ton score.</p>
     <div class="row">
@@ -267,7 +267,7 @@ function step(dt) {
 // ------------------------------------------------------------------ Auto: random Bébé rain
 function gauss() { return Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random()); }
 const rain = {
-  rate: 3.6, x: A.cx, nextT: 0.25,
+  rate: DATA.dropRate || 1, x: A.cx, nextT: 0.25,
   update() {
     if (S.over || S.won || S.time < this.nextT || !canDrop()) return;
     const [lo, hi] = aimRange(CH[0].radius);
@@ -517,7 +517,7 @@ function render() {
 // ------------------------------------------------------------------ events + flow
 function onEvent(e) {
   if (!revealed.has(e.tier)) revealed.set(e.tier, clock);
-  if (e.kind === "drop") { sound.plop(); return; }
+  if (e.kind === "drop") { sound.plop(); if (S.drops === 1) sound.voice(1); return; }
   fx.burst(e.x, e.y, e.tier, e.first);
   scorePop = 1;
   sound.pop(e.tier);
@@ -623,6 +623,12 @@ function frame(ts) {
 function snapshot() { return { S, mode: mode === "start" ? "start" : "play", auto, best: readBest() }; }
 function start(data) {
   fit();
+  const first = CH[0], last = CH[MAX - 1];
+  $("start-title").textContent = last.line;
+  $("win-title").textContent = last.line + " !";
+  $("start-text").innerHTML = `Touche l'écran pour lâcher une ${first.line.toLowerCase()}, garde le doigt appuyé pour en lâcher plein. ` +
+    `<strong>Deux patates pareilles qui se touchent fusionnent</strong> en une plus grosse. ` +
+    `Fais naître ${last.line.toLowerCase()} sans déborder du cercle.`;
   for (const c of CH) {
     const im = new Image(); im.src = c.sprite; im.alt = c.line;
     im.style.width = `calc(var(--u) * ${Math.round(40 + c.radius * 0.55)})`;
@@ -634,7 +640,7 @@ function start(data) {
     mode = "play"; $("ov-start").hidden = true; setAuto(!!data.auto);
   } else {
     // a few demo potatoes behind the start screen so the board isn't empty
-    for (const [t, x] of [[3, 420], [2, 560], [1, 650], [4, 470], [2, 700]]) makeBody(t, x, 900 + Math.random() * 300);
+    for (const [t, x] of [[3, 420], [2, 600], [1, 690], [1, 480]]) if (t <= MAX) makeBody(t, x, 900 + Math.random() * 300);
   }
   showBestOnStart();
   buildBackground(); buildCaptions();

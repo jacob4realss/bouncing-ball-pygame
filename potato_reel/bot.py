@@ -7,10 +7,10 @@ from .characters import CHARACTERS
 
 
 class Rain:
-    def __init__(self, world, seed=0, rate=3.4):
+    def __init__(self, world, seed=0, rate=None):
         self.w = world
         self.rng = random.Random(seed * 7717 + 3)
-        self.rate = rate                  # average drops per second
+        self.rate = rate or world.tune.drop_rate   # average drops per second
         self.x = world.arena.cx
         self.next_t = 0.25
 
@@ -30,7 +30,7 @@ class Rain:
         self.next_t = w.time + max(w.tune.min_gap, gap)
 
 
-def play(seed, fps=30, max_time=200.0, tune=None, rate=3.4):
+def play(seed, fps=30, max_time=200.0, tune=None, rate=None):
     """Play headlessly; returns the finished world."""
     from .physics import World, Tuning
     w = World(seed, fps, tune=tune or Tuning())

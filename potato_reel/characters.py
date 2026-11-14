@@ -17,17 +17,17 @@ HALF = 1.9      # sprite canvas half-size, in body radii (room for hats/horns)
 
 # (display name, skin RGB, style key)
 CAST = [
-    ("Bébé",    (230, 186, 128), "bebe"),
-    ("Douce",   (184,  92, 108), "douce"),
-    ("Pirate",  (190, 138,  82), "pirate"),
-    ("Chef",    (214, 164, 100), "chef"),
-    ("Mamie",   (204, 156, 110), "mamie"),
-    ("Rappeur", (168, 116,  66), "rappeur"),
-    ("Ninja",   (194, 142,  82), "ninja"),
-    ("Viking",  (198, 140,  84), "viking"),
-    ("Royale",  (222, 172,  84), "royale"),
+    ("Mahrez",   (204, 152,  96), "mahrez"),
+    ("Warda",    (222, 172, 120), "warda"),
+    ("Mexique",  (196, 142,  84), "mexique"),
+    ("Belahcen", (190, 140,  90), "belahcen"),
+    ("Choucha",  (214, 160,  92), "choucha"),
 ]
-RADII = [34, 42, 52, 64, 79, 97, 119, 146, 180]
+# Each tier has about twice the area of the one before (radius x ~1.41).
+RADII = [46, 64, 90, 126, 176]
+# The first cast (Bébé, Douce, Pirate, Chef, Mamie, Rappeur, Ninja, Viking, Royale)
+# is still drawable: use those style keys in CAST with 9 radii, for example
+# RADII = [34, 42, 52, 64, 79, 97, 119, 146, 180].
 PITCH_SMALLEST, PITCH_BIGGEST = 1.3, 0.66    # Henri's voice is already low
 
 
@@ -376,6 +376,133 @@ def _draw_royale(pen, back, clip, skin):
         pen.ellipse(0.9 * math.cos(r), 0.9 * math.sin(r), 0.025, 0.05, fill=(20, 20, 20, 255))
 
 
+# ---------------------------------------------------------------- the 2nd cast
+def _short_beard(clip, top=0.2, color=(44, 32, 26, 230)):
+    clip.poly([(-1.2, -0.05), (-0.85, 0.08), (-0.58, top), (-0.3, top + 0.05), (0, top + 0.03),
+               (0.3, top + 0.05), (0.58, top), (0.85, 0.08), (1.2, -0.05), (1.2, 1.3), (-1.2, 1.3)], fill=color)
+
+
+def _draw_mahrez(pen, back, clip, skin):
+    hair, hair_dk = (34, 24, 20, 255), (14, 10, 8, 255)
+    _short_beard(clip, top=0.18)
+    # Algeria home shirt: white with a green V collar
+    clip.poly([(-1.2, 0.66), (-0.3, 0.62), (0, 0.78), (0.3, 0.62), (1.2, 0.66), (1.2, 1.3), (-1.2, 1.3)],
+              fill=(248, 248, 246, 255))
+    clip.line([(-0.32, 0.64), (0, 0.84), (0.32, 0.64)], (0, 128, 64, 255), 0.07)
+    clip.circle(0.42, 0.9, 0.06, fill=(0, 128, 64, 255))
+    clip.circle(0.44, 0.9, 0.035, fill=(220, 30, 40, 255))
+    # short dark hair with a curly top
+    pen.chord(0, 0, 1.03, 1.04, 212, 328, fill=hair, outline=hair_dk, width=0.025)
+    for a in np.linspace(218, 322, 11):
+        r = math.radians(a)
+        pen.circle(0.98 * math.cos(r), 0.98 * math.sin(r) + 0.02, 0.1, fill=hair)
+    _eyes(pen, skin, rx=0.17, ry=0.19, y=-0.12, look=(0.35, 0.05))
+    for side in (-1, 1):
+        _brow(pen, side * 0.31, -0.38, side, 0.26, 0.15, 0.075, hair)
+    pen.line([(-0.24, 0.3), (0, 0.27), (0.24, 0.3)], (30, 20, 16, 255), 0.07)       # moustache
+    pen.arc(0, 0.38, 0.17, 0.1, 15, 165, (170, 80, 76, 255), 0.06)                # confident smile
+
+
+def _draw_warda(pen, back, clip, skin):
+    hair, hair_dk = (58, 32, 22, 255), (30, 14, 10, 255)
+    bp = Pen(back, pen.c, pen.u)
+    bp.poly([(-1.12, -0.2), (-1.2, 0.5), (-1.08, 0.95), (-0.7, 1.12), (0.7, 1.12), (1.08, 0.95),
+             (1.2, 0.5), (1.12, -0.2), (0.6, -1.0), (-0.6, -1.0)], fill=hair, outline=hair_dk, width=0.03)
+    _blush(clip, 120, y=0.2)
+    pen.poly([(-1.0, -0.15), (-0.98, -0.55), (-0.7, -0.88), (-0.2, -1.04), (0.35, -1.0), (0.8, -0.8),
+              (1.0, -0.45), (1.0, -0.15), (0.75, -0.5), (0.3, -0.62), (-0.15, -0.55), (-0.55, -0.42)],
+             fill=hair, outline=hair_dk, width=0.03)
+    # a rose in her hair ("warda" means rose)
+    for a in range(0, 360, 72):
+        r = math.radians(a)
+        pen.circle(-0.62 + 0.09 * math.cos(r), -0.78 + 0.09 * math.sin(r), 0.1,
+                   fill=(214, 30, 60, 255), outline=(120, 10, 30, 255), width=0.015)
+    pen.circle(-0.62, -0.78, 0.07, fill=(170, 16, 44, 255))
+    _leaf(pen, (-0.5, -0.72), math.radians(20), 0.24, 0.11, (70, 150, 60, 255), (30, 80, 25, 255))
+    for side in (-1, 1):
+        _eye(pen, side * 0.3, -0.08, 0.18, 0.2, look=(0, 0.1), skin=skin)
+        for k in (-0.6, 0, 0.6):          # lashes
+            x0 = side * 0.3 + side * (0.12 + 0.05 * k)
+            pen.line([(side * 0.3 + side * 0.1 * (1 + k * 0.4), -0.25), (x0 + side * 0.06, -0.33)], INK, 0.025)
+        _brow(pen, side * 0.3, -0.4, side, 0.22, -0.15, 0.04, hair)
+        pen.ellipse(side * 0.95, 0.24, 0.07, 0.1, outline=GOLD, width=0.035)
+    pen.chord(0, 0.3, 0.2, 0.14, 0, 180, fill=(200, 30, 60, 255), outline=(120, 10, 30, 255), width=0.02)
+    pen.line([(-0.18, 0.3), (0.18, 0.3)], (150, 16, 40, 255), 0.03)
+
+
+def _draw_mexique(pen, back, clip, skin):
+    straw, straw_dk = (232, 196, 112, 255), (150, 112, 40, 255)
+    _eyes(pen, skin, rx=0.18, ry=0.2, y=-0.1, look=(-0.2, 0.0))
+    for side in (-1, 1):
+        _brow(pen, side * 0.31, -0.36, side, 0.24, -0.2, 0.065)
+    pen.chord(0, 0.22, 0.38, 0.32, 0, 180, fill=(80, 20, 22, 255), outline=INK, width=0.03)   # big grin
+    pen.chord(0, 0.22, 0.32, 0.12, 0, 180, fill=(255, 255, 255, 255))                         # teeth
+    _blush(clip, 90)
+    # sombrero, a nod to the nickname
+    pen.ellipse(0, -0.74, 1.5, 0.24, fill=straw, outline=straw_dk, width=0.03)
+    pen.chord(0, -0.78, 0.55, 0.62, 180, 360, fill=straw, outline=straw_dk, width=0.03)
+    pen.rrect(-0.53, -0.96, 0.53, -0.8, 0.03, fill=(206, 40, 50, 255))
+    for i, x in enumerate(np.linspace(-0.45, 0.45, 7)):
+        pen.poly([(x - 0.07, -0.88), (x, -0.95 if i % 2 else -0.81), (x + 0.07, -0.88)],
+                 fill=(0, 140, 70, 255) if i % 2 else (255, 255, 255, 255))
+    for x in np.linspace(-1.3, 1.3, 9):
+        pen.circle(x, -0.62 + 0.12 * (1 - (x / 1.3) ** 2) ** 0.5, 0.05,
+                   fill=[(230, 40, 60, 255), (0, 150, 80, 255), (250, 200, 40, 255)][int(abs(x) * 10) % 3])
+
+
+def _draw_belahcen(pen, back, clip, skin):
+    hair, hair_dk = (26, 22, 22, 255), (8, 8, 8, 255)
+    _short_beard(clip, top=0.3, color=(40, 32, 30, 110))         # light stubble
+    # dark suit, white shirt, red tie
+    clip.poly([(-1.2, 0.6), (-0.3, 0.6), (0, 1.05), (0.3, 0.6), (1.2, 0.6), (1.2, 1.3), (-1.2, 1.3)],
+              fill=(34, 38, 58, 255))
+    clip.poly([(-0.3, 0.6), (0.3, 0.6), (0, 1.05)], fill=(250, 250, 250, 255))
+    clip.poly([(-0.07, 0.64), (0.07, 0.64), (0.1, 0.92), (0, 1.02), (-0.1, 0.92)], fill=(200, 30, 40, 255))
+    pen.chord(0, 0, 1.03, 1.04, 208, 332, fill=hair, outline=hair_dk, width=0.025)
+    pen.poly([(-0.95, -0.45), (-0.2, -0.62), (0.3, -0.6), (0.95, -0.45), (0.6, -0.75), (-0.5, -0.8)], fill=hair)
+    pen.line([(-0.3, -0.98), (-0.22, -0.6)], (90, 80, 80, 255), 0.025)           # side parting
+    _eyes(pen, skin, rx=0.15, ry=0.15, y=-0.1, look=(0.1, 0.0), lid=0.3)
+    frame = (16, 16, 18, 255)
+    for side in (-1, 1):
+        pen.rrect(side * 0.31 - 0.24, -0.27, side * 0.31 + 0.24, 0.07, 0.07, outline=frame, width=0.055)
+        pen.line([(side * 0.55, -0.16), (side * 0.93, -0.24)], frame, 0.045)
+        _brow(pen, side * 0.31, -0.36, side, 0.24, 0.3, 0.065, hair)
+    pen.line([(-0.07, -0.14), (0.07, -0.14)], frame, 0.05)
+    pen.line([(-0.2, 0.36), (0.05, 0.38), (0.22, 0.32)], INK, 0.05)               # serious smirk
+
+
+def _draw_choucha(pen, back, clip, skin):
+    hair, hair_dk = (30, 20, 16, 255), (10, 6, 4, 255)
+    _short_beard(clip, top=0.25, color=(36, 26, 22, 200))
+    # the famous big hair on top
+    rng = random.Random(77)
+    puffs = [(0, -1.35, 0.42), (-0.42, -1.18, 0.36), (0.42, -1.18, 0.36), (-0.72, -0.88, 0.3),
+             (0.72, -0.88, 0.3), (-0.2, -1.62, 0.3), (0.25, -1.6, 0.3), (0, -0.95, 0.5)]
+    for (x, y, r) in puffs:
+        pen.circle(x, y, r, fill=hair, outline=hair_dk, width=0.03)
+    for (x, y, r) in puffs:
+        pen.circle(x, y, r * 0.93, fill=hair)
+    for _ in range(40):
+        a, d = rng.uniform(0, 2 * math.pi), rng.uniform(0, 0.9)
+        x, y = d * 0.8 * math.cos(a), -1.2 + d * 0.45 * math.sin(a)
+        pen.arc(x, y, 0.06, 0.05, 200, 520, (60, 42, 34, 255), 0.02)
+    # gold aviators
+    for side in (-1, 1):
+        pen.poly([(side * 0.06, -0.24), (side * 0.56, -0.26), (side * 0.6, -0.12), (side * 0.48, 0.08),
+                  (side * 0.2, 0.08), (side * 0.08, -0.06)], fill=(24, 22, 30, 255), outline=GOLD, width=0.035)
+        pen.line([(side * 0.58, -0.22), (side * 0.95, -0.3)], GOLD, 0.035)
+        pen.line([(side * 0.42, -0.2), (side * 0.32, -0.06)], (255, 255, 255, 150), 0.03)
+    pen.line([(-0.07, -0.22), (0.07, -0.22)], GOLD, 0.035)
+    pen.arc(0, 0.32, 0.22, 0.13, 10, 170, (230, 230, 230, 255), 0.07)              # cocky grin
+    pen.arc(0, 0.32, 0.22, 0.13, 10, 170, INK, 0.02)
+    # gold chain with a big C
+    for a in np.linspace(40, 140, 17):
+        r = math.radians(a)
+        pen.ellipse(0.82 * math.cos(r), 0.82 * math.sin(r), 0.05, 0.035, fill=GOLD, outline=GOLD_DARK, width=0.015)
+    pen.circle(0, 0.94, 0.17, fill=GOLD, outline=GOLD_DARK, width=0.025)
+    pen.arc(0, 0.94, 0.09, 0.09, 40, 320, GOLD_DARK, 0.045)
+
+
 _STYLES = {k[len("_draw_"):]: v for k, v in globals().items() if k.startswith("_draw_")}
 
 
@@ -447,9 +574,9 @@ def character_sheet(path, cols=3):
     font = ImageFont.truetype(font_path(), 30) if font_path() else ImageFont.load_default()
     d = ImageDraw.Draw(sheet)
     for i, ch in enumerate(CHARACTERS):
-        spr = render_sprite(ch, radius=85)
+        spr = render_sprite(ch, radius=72)
         x, y = (i % cols) * cell, (i // cols) * cell
-        sheet.paste(spr, (x + (cell - spr.width) // 2, y + (cell - spr.height) // 2 - 22), spr)
+        sheet.paste(spr, (x + (cell - spr.width) // 2, y + (cell - spr.height) // 2 - 8), spr)
         label = f"{ch.tier}. {ch.line}"
         tw = d.textlength(label, font=font)
         d.text((x + (cell - tw) / 2, y + cell - 52), label, font=font, fill=(245, 228, 110))

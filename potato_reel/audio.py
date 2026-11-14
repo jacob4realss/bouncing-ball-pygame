@@ -126,9 +126,15 @@ def build_track(events, duration, voice_dir, with_voice=True):
     pops = {ch.tier: pop_sound(ch.tier) for ch in CHARACTERS}
     last_t, last_tier, last_len = -9.0, 0, 0.0
     plop = drop_sound()
+    announced = False
     for e in events:
         if e.kind == "drop":
             add(plop, e.t, 0.18)
+            if with_voice and not announced:     # name the dropped potato once, at the start
+                clip = voices[1]
+                add(clip, e.t + 0.1, 1.0)
+                announced = True
+                last_t, last_tier, last_len = e.t, 1, len(clip) / SR
             continue
         if e.kind != "merge":
             continue
