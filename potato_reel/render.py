@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from . import audio
 from .assets import font_path
 from .characters import CHARACTERS, MAX_TIER, render_sprite
-from .bot import Bot, landing
+from .bot import Rain
 from .physics import H, W, World
 
 YELLOW = (247, 229, 104)
@@ -215,7 +215,6 @@ class Renderer:
         self.icons = {c.tier: _surf(render_sprite(c, radius=33)) for c in CHARACTERS}
         self.labels = {c.tier: _surf(_text_img(c.line + " !", 46, YELLOW + (255,), stroke=4))
                        for c in CHARACTERS}
-        self.next_label = _surf(_text_img("SUIVANT", 34, (235, 235, 240, 255)))
         self.score_font = _pg_font(104)
         self.q_font = _pg_font(44)
         self.fx = Effects(random.Random(world.seed * 31 + 7))
@@ -247,46 +246,13 @@ class Renderer:
             img = pygame.transform.rotozoom(spr, -math.degrees(b.ang), scale)
             s.blit(img, (b.x + ox - img.get_width() / 2, b.y + oy - img.get_height() / 2))
         self.fx.draw_world(s, ox, oy)
-        if aim is not None:
-            self._draw_dropper(aim, ox, oy)
         s.blit(self.overlay, (0, 0))
-        self._draw_next()
         self._draw_score()
         self._draw_tiers(vt)
         self.fx.draw_ui(s)
         if self.fx.flash > 0:
             self.flash.set_alpha(int(200 * self.fx.flash ** 2))
             s.blit(self.flash, (0, 0))
-
-    def _draw_dropper(self, aim, ox, oy):
-        w = self.world
-        if w.game_over or w.top_time is not None:
-            return
-        tier = w.current
-        ch = CHARACTERS[tier - 1]
-        lo, hi = w.arena.aim_range(ch.radius)
-        x = max(lo, min(hi, aim))
-        y = w.arena.drop_y
-        land_y, _ = landing(w, x, ch.radius)
-        for yy in range(int(y + ch.radius + 10), int(land_y), 26):      # dashed aim line
-            pygame.draw.line(self.screen, (120, 120, 132), (x + ox, yy + oy), (x + ox, min(land_y, yy + 13) + oy), 4)
-        if not w.can_drop:              # next potato pops in after the cooldown
-            return
-        since = w.time - w.ready_at
-        scale = min(1.0, 0.4 + since / 0.12)
-        img = pygame.transform.rotozoom(self.sprites[tier], 0, scale)
-        self.screen.blit(img, (x + ox - img.get_width() / 2, y + oy - img.get_height() / 2))
-
-    def _draw_next(self):
-        w = self.world
-        if w.top_time is not None:
-            return
-        cx, cy = 968, 505
-        self.screen.blit(self.next_label, (cx - self.next_label.get_width() / 2, cy - 78))
-        pygame.draw.circle(self.screen, (30, 30, 40), (cx, cy), 50)
-        pygame.draw.circle(self.screen, (90, 90, 104), (cx, cy), 50, 3)
-        img = self.icons[w.next]
-        self.screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
 
     def _draw_score(self):
         target = self.world.score
@@ -322,12 +288,12 @@ class Renderer:
         return pygame.image.tobytes(self.screen, "RGB")
 
 
-def render_video(seed, out_path, fps=30, outro=4.5, max_len=150.0,
+def render_video(seed, out_path, fps=30, outro=4.5, max_len=200.0,
                  hook="Attends la dernière patate", teaser=None, voice=True,
                  voice_dir="output/voices", stills=(), preset="medium", log=print):
-    """Play one game with the bot and render it. Returns a dict with timing info."""
+    """Play one game (random Bébé drops) and render it. Returns a dict with timing info."""
     world = World(seed, fps)
-    bot = Bot(world, seed)
+    rain = Rain(world, seed)
     if teaser is None:
         teaser = f"NOUVEAU : {CHARACTERS[-1].line}"
     r = Renderer(world, hook, teaser)
@@ -350,12 +316,12 @@ def render_video(seed, out_path, fps=30, outro=4.5, max_len=150.0,
     while True:
         vt = frame * dt
         if frame > 0:                      # same order as bot.play(), so seeds replay exactly
-            bot.update(dt)
+            rain.update(dt)
             world.advance_frame()
         new = world.events[seen_events:]
         seen_events = len(world.events)
         r.on_events(new, vt)
-        r.draw(vt, dt, aim=bot.aim)
+        r.draw(vt, dt)
         enc.stdin.write(r.frame_bytes())
         while stills and vt >= stills[0]:
             p = os.path.join(out_dir, f"still_{stills.pop(0):05.1f}s.png")

@@ -1,5 +1,6 @@
-"""Merge-game physics: a player drops one potato at a time into an open ring;
-two potatoes of the same kind fuse into the next, bigger one.
+"""Merge-game physics: only the smallest potato is ever dropped, from above the
+screen into an open ring. Two potatoes of the same kind that touch fuse into
+the next, bigger one, so every other character is made inside the ring.
 
 There are no hidden helpers: merges only happen when potatoes really touch,
 and the game is lost if the pile stays above the rim. Deterministic for a
@@ -42,8 +43,9 @@ class Arena:
 
 @dataclass
 class Tuning:
-    gravity: float = 2600.0
-    restitution: float = 0.12
+    gravity: float = 3200.0
+    restitution: float = 0.45    # bounciness of a hard hit
+    bounce_min: float = 140.0    # px/s: softer contacts don't bounce (keeps piles calm)
     friction: float = 0.25
     air: float = 0.9996
     correction: float = 0.85
@@ -51,8 +53,8 @@ class Tuning:
     merge_slop: float = 1.5      # px of gap that still counts as touching
     min_merge_age: float = 0.06
     grow_time: float = 0.14      # s for a merged potato to reach full size
-    drop_weights: tuple = (3, 3, 3, 2, 2)   # odds the next potato is tier 1..5
-    cooldown: float = 0.45       # s before the next potato can be dropped
+    drop_speed: float = 700.0    # px/s downward when a potato enters at the top
+    min_gap: float = 0.1         # s between two drops
     lose_time: float = 2.5       # s a potato may sit above the rim before game over
 
 
@@ -101,8 +103,6 @@ class World:
         self.seen = set()
         self.top_time = None
         self.game_over = False
-        self.current = 1                        # a game always opens small
-        self.next = self.rng.choice((1, 2))
         self.ready_at = 0.0
         self._next_id = 0
 
@@ -111,15 +111,18 @@ class World:
     def can_drop(self):
         return not self.game_over and self.time >= self.ready_at
 
-    def drop(self, x):
-        r = CHARACTERS[self.current - 1].radius
+    def drop(self, x, vx=0.0):
+        """Drop the smallest potato from above the screen at x (clamped to the opening)."""
+        if not self.can_drop:
+            return False
+        r = CHARACTERS[0].radius
         lo, hi = self.arena.aim_range(r)
         x = max(lo, min(hi, x))
-        _, first = self._new_body(self.current, x, self.arena.drop_y, vy=200.0)
-        self.events.append(Event(self.time, "drop", self.current, x, self.arena.drop_y, first))
-        self.current, self.next = self.next, self._roll()
-        self.ready_at = self.time + self.tune.cooldown
+        _, first = self._new_body(1, x, -r - 10, vx=vx, vy=self.tune.drop_speed)
+        self.events.append(Event(self.time, "drop", 1, x, -r, first))
+        self.ready_at = self.time + self.tune.min_gap
         self.drops += 1
+        return True
 
     def advance_frame(self):
         for _ in range(self.substeps):
@@ -127,10 +130,6 @@ class World:
             self.time += self.dt
 
     # ------------------------------------------------------------ internals
-    def _roll(self):
-        w = self.tune.drop_weights
-        return self.rng.choices(range(1, len(w) + 1), weights=w)[0]
-
     def _new_body(self, tier, x, y, vx=0.0, vy=0.0, r=None):
         b = Body(self._next_id, tier, x, y, vx, vy, r)
         self._next_id += 1
@@ -223,7 +222,8 @@ class World:
                 rvx, rvy = b.vx - a.vx, b.vy - a.vy
                 vn = rvx * nx + rvy * ny
                 if vn < 0:
-                    jn = -(1 + t.restitution) * vn / s
+                    e = t.restitution if -vn > t.bounce_min else 0.0
+                    jn = -(1 + e) * vn / s
                     vt = -rvx * ny + rvy * nx
                     jt = max(-t.friction * jn, min(t.friction * jn, -vt / s))
                     px, py = jn * nx - jt * ny, jn * ny + jt * nx
@@ -246,8 +246,9 @@ class World:
                     b.x -= nx * pen; b.y -= ny * pen
                     vn = b.vx * nx + b.vy * ny
                     if vn > 0:
-                        b.vx -= (1 + t.restitution) * vn * nx
-                        b.vy -= (1 + t.restitution) * vn * ny
+                        e = t.restitution if vn > t.bounce_min else 0.0
+                        b.vx -= (1 + e) * vn * nx
+                        b.vy -= (1 + e) * vn * ny
                         b.vx *= 0.985
                     b.contact = True
             for (px, py) in A.corners:    # the two ends of the ring
@@ -258,6 +259,7 @@ class World:
                     b.x += ux * (b.r - e); b.y += uy * (b.r - e)
                     vn = b.vx * ux + b.vy * uy
                     if vn < 0:
-                        b.vx -= (1 + t.restitution) * vn * ux
-                        b.vy -= (1 + t.restitution) * vn * uy
+                        e = t.restitution if -vn > t.bounce_min else 0.0
+                        b.vx -= (1 + e) * vn * ux
+                        b.vy -= (1 + e) * vn * uy
                     b.contact = True

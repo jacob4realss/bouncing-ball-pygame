@@ -12,7 +12,7 @@ from .bot import play
 
 
 def find_seed(start, fps, lo, hi, tries=80):
-    """First seed where the bot wins, with the last potato between lo and hi seconds."""
+    """First seed whose game reaches the last potato between lo and hi seconds."""
     for seed in range(start, start + tries):
         w = play(seed, fps, max_time=hi + 1)
         if w.top_time is not None and lo <= w.top_time <= hi:
@@ -26,8 +26,8 @@ def main():
     ap.add_argument("--out", default="output/potato_reel.mp4")
     ap.add_argument("--seed", type=int, help="fixed seed (default: search for one that fits the length)")
     ap.add_argument("--search-from", type=int, default=1)
-    ap.add_argument("--min-len", type=float, default=55, help="earliest the last potato may appear (s)")
-    ap.add_argument("--max-len", type=float, default=85, help="latest the last potato may appear (s)")
+    ap.add_argument("--min-len", type=float, default=40, help="earliest the last potato may appear (s)")
+    ap.add_argument("--max-len", type=float, default=170, help="latest the last potato may appear (s)")
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--hook", default="Attends la dernière patate")
     ap.add_argument("--teaser", default=None, help='yellow line (default "NOUVEAU : La patate <last>")')
