@@ -70,13 +70,17 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 
 > **Note**: This implementation is for educational and entertainment purposes. The game logic and physics are simplified for demonstration purposes.
 
-## 🥔 Potato Merge Reels (`potato_reel/`)
+## 🥔 La Patate Royale: merge game + reel maker (`potato_reel/`)
 
-A second tool in this repo that **renders vertical (1080×1920) merge-game reels**.
-Potatoes drop through a funnel into a glowing rainbow ring, and when two of the same
-kind touch they merge into the next, bigger character. Every merge triggers a French
-voice line, **« La patate … »**, pitched deeper the bigger the potato. The reel ends
-a few seconds after the final potato appears.
+A potato merge game in two forms:
+
+- **A video reel** (1080×1920 MP4): a bot plays a real game from an empty ring,
+  aiming and dropping one potato at a time, until the last potato appears.
+- **A browser game** you play yourself: touch to aim, release to drop, with an Auto mode.
+
+Two potatoes of the same kind merge into the next, bigger one, and every merge
+plays a French voice line, **« La patate … »**, pitched deeper the bigger the potato.
+You lose if the pile stays above the top of the ring.
 
 | Tier | Voice line | Tier | Voice line | Tier | Voice line |
 |---|---|---|---|---|---|
@@ -91,16 +95,24 @@ a few seconds after the final potato appears.
 
 ### Make a reel
 ```bash
-python -m potato_reel                       # picks a seed so the last potato lands at 35–52s
-python -m potato_reel --seed 7 --out output/reel_7.mp4
+python -m potato_reel                       # picks a game the bot wins in 55–85s
+python -m potato_reel --seed 13 --out output/reel_13.mp4
+python -m potato_reel --min-len 45 --max-len 60
 python -m potato_reel --hook "Wait for the last potato" --teaser "NOUVEAU : La patate Royale"
 python -m potato_reel --characters          # saves output/characters.png (the whole cast)
 python -m potato_reel --stills 5,20         # also saves PNG frames at those seconds
 ```
-Each seed plays out differently, so render a few and post the best one.
+Every seed is a different game, so render a few and post the best one.
+
+### Build the browser game
+```bash
+python -m potato_reel.web                   # writes output/potato_game.html (open it in any browser)
+```
+The file is self-contained (art and voices embedded), so it works offline and on a phone.
 
 ### Customising
 - **Characters:** edit `CAST` in `potato_reel/characters.py` (name, skin colour, drawing style).
 - **Your own voice:** put recordings in `output/voices/` named `<tier>_<Name>.mp3` or `.wav`
   (for example `9_Royale.mp3`, `1_Bebe.wav`; accents dropped from the file name). They replace the generated lines.
-- **Pacing:** `Tuning` in `potato_reel/physics.py` (drop speed, gravity, how often drops match).
+- **Game rules:** `Tuning` in `potato_reel/physics.py` (gravity, which potatoes you get, cooldown).
+  The browser game has the same values at the top of its script in `potato_reel/web_template.html`.

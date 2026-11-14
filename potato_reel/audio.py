@@ -84,6 +84,13 @@ def pop_sound(tier):
     return (y / np.max(np.abs(y)) * 0.8).astype(np.float32)
 
 
+def drop_sound():
+    """Soft 'plop' when the player lets go of a potato."""
+    t = np.arange(int(0.07 * SR)) / SR
+    y = np.sin(2 * np.pi * np.cumsum(420 - 2500 * t) / SR) * np.exp(-t * 55)
+    return (y / np.max(np.abs(y)) * 0.8).astype(np.float32)
+
+
 def build_track(events, duration, voice_dir, with_voice=True):
     """Mix voices + pops for all merge events; returns stereo int16 samples."""
     n = int((duration + 1.0) * SR)
@@ -99,7 +106,11 @@ def build_track(events, duration, voice_dir, with_voice=True):
     voices = {ch.tier: voice_clip(ch, voice_dir) for ch in CHARACTERS} if with_voice else {}
     pops = {ch.tier: pop_sound(ch.tier) for ch in CHARACTERS}
     last_t, last_tier, last_len = -9.0, 0, 0.0
+    plop = drop_sound()
     for e in events:
+        if e.kind == "drop":
+            add(plop, e.t, 0.18)
+            continue
         if e.kind != "merge":
             continue
         add(pops[e.tier], e.t, 0.35 + 0.03 * e.tier)

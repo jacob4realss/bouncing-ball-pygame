@@ -1,7 +1,9 @@
-"""Merge physics: circles fall through a funnel into a ring; equal tiers fuse.
+"""Merge-game physics: a player drops one potato at a time into an open ring;
+two potatoes of the same kind fuse into the next, bigger one.
 
-Deterministic for a given seed and frame rate, so a run can be searched
-headlessly for a good seed and then replayed identically while rendering.
+There are no hidden helpers: merges only happen when potatoes really touch,
+and the game is lost if the pile stays above the rim. Deterministic for a
+given seed, so a run can be searched headlessly and replayed while rendering.
 """
 import math
 import random
@@ -15,17 +17,27 @@ W, H = 1080, 1920
 @dataclass
 class Arena:
     cx: float = 540.0
-    cy: float = 975.0
+    cy: float = 1000.0
     R: float = 490.0          # inner radius of the ring
-    gap: float = 164.0        # funnel width
-
-    @property
-    def gap_y(self):          # y where the funnel walls meet the ring
-        return self.cy - math.sqrt(self.R ** 2 - (self.gap / 2) ** 2)
+    open_deg: float = 42.0    # half-angle of the opening at the top
 
     @property
     def corners(self):
-        return [(self.cx - self.gap / 2, self.gap_y), (self.cx + self.gap / 2, self.gap_y)]
+        a = math.radians(self.open_deg)
+        dx, dy = self.R * math.sin(a), self.R * math.cos(a)
+        return [(self.cx - dx, self.cy - dy), (self.cx + dx, self.cy - dy)]
+
+    @property
+    def rim_y(self):          # the "don't fill above this" line
+        return self.corners[0][1]
+
+    @property
+    def drop_y(self):         # where the held potato hangs
+        return self.rim_y - 100
+
+    def aim_range(self, r):
+        (lx, _), (rx, _) = self.corners
+        return lx + r + 6, rx - r - 6
 
 
 @dataclass
@@ -39,17 +51,14 @@ class Tuning:
     merge_slop: float = 1.5      # px of gap that still counts as touching
     min_merge_age: float = 0.06
     grow_time: float = 0.14      # s for a merged potato to reach full size
-    magnet: float = 1000.0       # gentle pull between equal tiers (keeps merges flowing)
-    magnet_range: float = 2.4    # in multiples of (ra + rb)
-    spawn_max_tier: int = 4
-    spawn_interval: tuple = (0.18, 0.26)
-    first_spawn: float = 0.5
-    match_bias: float = 0.65     # chance the next drop matches a small potato already inside
-    spawn_weights: tuple = (2, 3, 3, 3)   # odds of dropping tier 1..spawn_max_tier
+    drop_weights: tuple = (3, 3, 3, 2, 2)   # odds the next potato is tier 1..5
+    cooldown: float = 0.45       # s before the next potato can be dropped
+    lose_time: float = 2.5       # s a potato may sit above the rim before game over
 
 
 class Body:
-    __slots__ = ("id", "x", "y", "vx", "vy", "r", "rt", "tier", "ang", "age", "alive", "contact")
+    __slots__ = ("id", "x", "y", "vx", "vy", "r", "rt", "tier", "ang", "age", "alive",
+                 "contact", "over")
 
     def __init__(self, bid, tier, x, y, vx=0.0, vy=0.0, r=None):
         self.id, self.tier = bid, tier
@@ -60,12 +69,13 @@ class Body:
         self.age = 0.0
         self.alive = True
         self.contact = False
+        self.over = 0.0
 
 
 @dataclass
 class Event:
     t: float
-    kind: str          # "spawn" | "merge"
+    kind: str          # "drop" | "merge"
     tier: int
     x: float
     y: float
@@ -87,24 +97,40 @@ class World:
         self.events = []
         self.time = 0.0
         self.score = 0
+        self.drops = 0
         self.seen = set()
         self.top_time = None
-        self.overflow = False
-        self.next_spawn = self.tune.first_spawn
+        self.game_over = False
+        self.current = 1                        # a game always opens small
+        self.next = self.rng.choice((1, 2))
+        self.ready_at = 0.0
         self._next_id = 0
 
-    # ------------------------------------------------------------ public
+    # ------------------------------------------------------------ player API
+    @property
+    def can_drop(self):
+        return not self.game_over and self.time >= self.ready_at
+
+    def drop(self, x):
+        r = CHARACTERS[self.current - 1].radius
+        lo, hi = self.arena.aim_range(r)
+        x = max(lo, min(hi, x))
+        _, first = self._new_body(self.current, x, self.arena.drop_y, vy=200.0)
+        self.events.append(Event(self.time, "drop", self.current, x, self.arena.drop_y, first))
+        self.current, self.next = self.next, self._roll()
+        self.ready_at = self.time + self.tune.cooldown
+        self.drops += 1
+
     def advance_frame(self):
         for _ in range(self.substeps):
-            self._maybe_spawn()
             self._step(self.dt)
             self.time += self.dt
 
-    @property
-    def stopped_spawning(self):
-        return self.top_time is not None
+    # ------------------------------------------------------------ internals
+    def _roll(self):
+        w = self.tune.drop_weights
+        return self.rng.choices(range(1, len(w) + 1), weights=w)[0]
 
-    # ------------------------------------------------------------ spawning
     def _new_body(self, tier, x, y, vx=0.0, vy=0.0, r=None):
         b = Body(self._next_id, tier, x, y, vx, vy, r)
         self._next_id += 1
@@ -113,29 +139,6 @@ class World:
         self.seen.add(tier)
         return b, first
 
-    def _choose_tier(self):
-        t = self.tune
-        inside = sorted(b.tier for b in self.bodies
-                        if b.alive and b.y > self.arena.gap_y and b.tier <= t.spawn_max_tier)
-        if inside and self.rng.random() < t.match_bias:
-            # favour the smallest potatoes so leftovers get cleaned up
-            return inside[min(int(self.rng.expovariate(1.2)), len(inside) - 1)]
-        return self.rng.choices(range(1, t.spawn_max_tier + 1), weights=t.spawn_weights[:t.spawn_max_tier])[0]
-
-    def _maybe_spawn(self):
-        if self.stopped_spawning or self.time < self.next_spawn:
-            return
-        if any(b.y - b.r < 60 for b in self.bodies):   # top of the funnel still busy
-            return
-        tier = self._choose_tier()
-        r = CHARACTERS[tier - 1].radius
-        slack = max(0.0, self.arena.gap / 2 - r) * 0.6
-        x = self.arena.cx + self.rng.uniform(-slack, slack)
-        _, first = self._new_body(tier, x, -r - 5, vy=650.0)
-        self.events.append(Event(self.time, "spawn", tier, x, -r, first))
-        self.next_spawn = self.time + self.rng.uniform(*self.tune.spawn_interval)
-
-    # ------------------------------------------------------------ simulation
     def _step(self, dt):
         t, A = self.tune, self.arena
         g = t.gravity * dt
@@ -149,42 +152,25 @@ class World:
             b.x += b.vx * dt
             b.y += b.vy * dt
             b.contact = False
-        if t.magnet:
-            self._magnet(dt)
         born = []
         for _ in range(t.iterations):
             self._collide(born)
             self._bounds()
         if born or any(not b.alive for b in self.bodies):
             self.bodies = [b for b in self.bodies if b.alive]
+        rim = A.rim_y
         for b in self.bodies:
             # Visual tilt only (not used by the physics): roll a little, then
             # settle back upright so faces stay readable.
             if b.contact:
                 b.ang += 0.4 * b.vx / b.r * dt
             b.ang -= b.ang * 1.5 * dt
-            if b.age > 1.5 and b.y < A.gap_y and not self.stopped_spawning:
-                self.overflow = True
-
-    def _magnet(self, dt):
-        t, gy = self.tune, self.arena.gap_y
-        B = self.bodies
-        for i in range(len(B)):
-            a = B[i]
-            if a.y < gy or a.age < 0.3 or a.tier >= MAX_TIER:
-                continue
-            for j in range(i + 1, len(B)):
-                b = B[j]
-                if b.tier != a.tier or b.y < gy or b.age < 0.3:
-                    continue
-                dx, dy = b.x - a.x, b.y - a.y
-                rng = t.magnet_range * (a.r + b.r)
-                d = math.hypot(dx, dy)
-                if d >= rng or d < 1e-6:
-                    continue
-                k = t.magnet * (1 - d / rng) * dt / d
-                a.vx += dx * k; a.vy += dy * k
-                b.vx -= dx * k; b.vy -= dy * k
+            if b.age > 1.0 and b.y - b.r < rim:
+                b.over += dt
+                if b.over > t.lose_time and self.top_time is None:
+                    self.game_over = True
+            else:
+                b.over = 0.0
 
     def _merge(self, a, b, born):
         a.alive = b.alive = False
@@ -247,16 +233,14 @@ class World:
 
     def _bounds(self):
         t, A = self.tune, self.arena
-        half = A.gap / 2
-        gy = A.gap_y
+        cos_open = math.cos(math.radians(A.open_deg))
         for b in self.bodies:
             if not b.alive:
                 continue
             dx, dy = b.x - A.cx, b.y - A.cy
             d = math.hypot(dx, dy) or 1e-6
             nx, ny = dx / d, dy / d
-            in_opening = ny < 0 and abs(nx * A.R) < half
-            if not in_opening:
+            if -ny < cos_open:            # facing the ring, not the opening
                 pen = d + b.r - A.R
                 if pen > 0:
                     b.x -= nx * pen; b.y -= ny * pen
@@ -266,14 +250,6 @@ class World:
                         b.vy -= (1 + t.restitution) * vn * ny
                         b.vx *= 0.985
                     b.contact = True
-            if b.y < gy:   # inside the funnel: vertical walls
-                lo, hi = A.cx - half + b.r, A.cx + half - b.r
-                if lo > hi:
-                    b.x, b.vx = A.cx, 0.0
-                elif b.x < lo:
-                    b.x, b.vx = lo, abs(b.vx) * t.restitution
-                elif b.x > hi:
-                    b.x, b.vx = hi, -abs(b.vx) * t.restitution
             for (px, py) in A.corners:    # the two ends of the ring
                 ex, ey = b.x - px, b.y - py
                 e = math.hypot(ex, ey)
@@ -284,14 +260,4 @@ class World:
                     if vn < 0:
                         b.vx -= (1 + t.restitution) * vn * ux
                         b.vy -= (1 + t.restitution) * vn * uy
-
-
-def simulate(seed, fps=30, max_time=90.0, tune=None):
-    """Run headlessly; return (world, seconds until the last potato or None)."""
-    w = World(seed, fps, tune=tune or Tuning())
-    frames = int(max_time * fps)
-    for _ in range(frames):
-        w.advance_frame()
-        if w.overflow or w.top_time is not None:
-            break
-    return w, w.top_time
+                    b.contact = True

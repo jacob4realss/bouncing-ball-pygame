@@ -17,6 +17,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from . import audio
 from .assets import font_path
 from .characters import CHARACTERS, MAX_TIER, render_sprite
+from .bot import Bot, landing
 from .physics import H, W, World
 
 YELLOW = (247, 229, 104)
@@ -68,7 +69,7 @@ def build_background(arena):
     d = ImageDraw.Draw(ring)
     width = 14
     Rr = arena.R + width / 2
-    a_gap = math.asin((arena.gap / 2 + 4) / Rr)
+    a_gap = math.radians(arena.open_deg)                  # ring is open at the top
     N = 1400
     pts = []
     for i in range(N + 1):
@@ -87,18 +88,10 @@ def build_background(arena):
         d.line([(x0 * k, y0 * k), (x1 * k, y1 * k)], fill=col, width=int(width * k))
     ring = ring.resize((W, H), Image.LANCZOS)
 
-    walls = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    dw = ImageDraw.Draw(walls)
-    for side in (-1, 1):
-        x = arena.cx + side * (arena.gap / 2 + 4)
-        dw.line([(x, 0), (x, pts[0][0][1])], fill=(240, 240, 246, 255), width=8)
-
-    for layer, blur, times in ((ring, 18, 2), (walls, 10, 1)):
-        glow = layer.filter(ImageFilter.GaussianBlur(blur))
-        for _ in range(times):
-            img.alpha_composite(glow)
+    glow = ring.filter(ImageFilter.GaussianBlur(18))
+    img.alpha_composite(glow)
+    img.alpha_composite(glow)
     img.alpha_composite(ring)
-    img.alpha_composite(walls)
     return img
 
 
@@ -106,7 +99,7 @@ def build_overlay(hook, teaser):
     """Static captions drawn above the potatoes: the white hook box + yellow teaser."""
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    box = (78, 282, 1002, 388)
+    box = (78, 186, 1002, 292)
     d.rounded_rectangle(box, radius=22, fill=(255, 255, 255, 255))
     eyes = _eyes_emoji(58)
     room = box[2] - box[0] - 60
@@ -126,7 +119,7 @@ def build_overlay(hook, teaser):
         t = _text_img(teaser, 66, YELLOW + (255,), stroke=5)
         while t.width > W - 60:
             t = t.resize((int(t.width * 0.95), int(t.height * 0.95)), Image.LANCZOS)
-        img.alpha_composite(t, ((W - t.width) // 2, 450 - t.height // 2))
+        img.alpha_composite(t, ((W - t.width) // 2, 352 - t.height // 2))
     return img
 
 
@@ -222,6 +215,7 @@ class Renderer:
         self.icons = {c.tier: _surf(render_sprite(c, radius=33)) for c in CHARACTERS}
         self.labels = {c.tier: _surf(_text_img(c.line + " !", 46, YELLOW + (255,), stroke=4))
                        for c in CHARACTERS}
+        self.next_label = _surf(_text_img("SUIVANT", 34, (235, 235, 240, 255)))
         self.score_font = _pg_font(104)
         self.q_font = _pg_font(44)
         self.fx = Effects(random.Random(world.seed * 31 + 7))
@@ -239,7 +233,7 @@ class Renderer:
                 self.fx.burst(e.x, e.y, e.tier, e.first, self.labels[e.tier] if e.tier >= 3 else None)
                 self.score_pop = 1.0
 
-    def draw(self, vt, dt):
+    def draw(self, vt, dt, aim=None):
         s = self.screen
         self.fx.update(dt)
         ox, oy = self.fx.offset()
@@ -253,13 +247,46 @@ class Renderer:
             img = pygame.transform.rotozoom(spr, -math.degrees(b.ang), scale)
             s.blit(img, (b.x + ox - img.get_width() / 2, b.y + oy - img.get_height() / 2))
         self.fx.draw_world(s, ox, oy)
+        if aim is not None:
+            self._draw_dropper(aim, ox, oy)
         s.blit(self.overlay, (0, 0))
+        self._draw_next()
         self._draw_score()
         self._draw_tiers(vt)
         self.fx.draw_ui(s)
         if self.fx.flash > 0:
             self.flash.set_alpha(int(200 * self.fx.flash ** 2))
             s.blit(self.flash, (0, 0))
+
+    def _draw_dropper(self, aim, ox, oy):
+        w = self.world
+        if w.game_over or w.top_time is not None:
+            return
+        tier = w.current
+        ch = CHARACTERS[tier - 1]
+        lo, hi = w.arena.aim_range(ch.radius)
+        x = max(lo, min(hi, aim))
+        y = w.arena.drop_y
+        land_y, _ = landing(w, x, ch.radius)
+        for yy in range(int(y + ch.radius + 10), int(land_y), 26):      # dashed aim line
+            pygame.draw.line(self.screen, (120, 120, 132), (x + ox, yy + oy), (x + ox, min(land_y, yy + 13) + oy), 4)
+        if not w.can_drop:              # next potato pops in after the cooldown
+            return
+        since = w.time - w.ready_at
+        scale = min(1.0, 0.4 + since / 0.12)
+        img = pygame.transform.rotozoom(self.sprites[tier], 0, scale)
+        self.screen.blit(img, (x + ox - img.get_width() / 2, y + oy - img.get_height() / 2))
+
+    def _draw_next(self):
+        w = self.world
+        if w.top_time is not None:
+            return
+        cx, cy = 968, 505
+        self.screen.blit(self.next_label, (cx - self.next_label.get_width() / 2, cy - 78))
+        pygame.draw.circle(self.screen, (30, 30, 40), (cx, cy), 50)
+        pygame.draw.circle(self.screen, (90, 90, 104), (cx, cy), 50, 3)
+        img = self.icons[w.next]
+        self.screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
 
     def _draw_score(self):
         target = self.world.score
@@ -270,13 +297,13 @@ class Renderer:
         img = self.score_font.render(f"SCORE: {int(round(self.shown_score))}", True, (255, 255, 255))
         if self.score_pop > 0.02:
             img = pygame.transform.rotozoom(img, 0, 1 + 0.08 * self.score_pop)
-        self.screen.blit(img, ((W - img.get_width()) / 2, 1500 - img.get_height() / 2))
+        self.screen.blit(img, ((W - img.get_width()) / 2, 1562 - img.get_height() / 2))
 
     def _draw_tiers(self, vt):
         n = MAX_TIER
         step = 112
         x0 = W / 2 - step * (n - 1) / 2
-        y = 1628
+        y = 1676
         for i, ch in enumerate(CHARACTERS):
             x = x0 + i * step
             t_rev = self.revealed.get(ch.tier)
@@ -295,19 +322,16 @@ class Renderer:
         return pygame.image.tobytes(self.screen, "RGB")
 
 
-def render_video(seed, out_path, fps=30, preroll=2.0, outro=4.0, max_len=75.0,
+def render_video(seed, out_path, fps=30, outro=4.5, max_len=150.0,
                  hook="Attends la dernière patate", teaser=None, voice=True,
                  voice_dir="output/voices", stills=(), preset="medium", log=print):
-    """Simulate + render one reel. Returns a dict with timing info."""
+    """Play one game with the bot and render it. Returns a dict with timing info."""
     world = World(seed, fps)
-    for _ in range(int(preroll * fps)):
-        world.advance_frame()
+    bot = Bot(world, seed)
     if teaser is None:
         teaser = f"NOUVEAU : {CHARACTERS[-1].line}"
     r = Renderer(world, hook, teaser)
-    for e in world.events:                 # potatoes already on screen at frame 0
-        r.revealed.setdefault(e.tier, -10.0)
-    seen_events = len(world.events)
+    seen_events = 0
 
     out_dir = os.path.dirname(os.path.abspath(out_path))
     os.makedirs(out_dir, exist_ok=True)
@@ -325,19 +349,20 @@ def render_video(seed, out_path, fps=30, preroll=2.0, outro=4.0, max_len=75.0,
     end_at = None
     while True:
         vt = frame * dt
-        if frame > 0:
+        if frame > 0:                      # same order as bot.play(), so seeds replay exactly
+            bot.update(dt)
             world.advance_frame()
         new = world.events[seen_events:]
         seen_events = len(world.events)
         r.on_events(new, vt)
-        r.draw(vt, dt)
+        r.draw(vt, dt, aim=bot.aim)
         enc.stdin.write(r.frame_bytes())
         while stills and vt >= stills[0]:
             p = os.path.join(out_dir, f"still_{stills.pop(0):05.1f}s.png")
             pygame.image.save(r.screen, p)
             saved_stills.append(p)
-        if end_at is None and world.top_time is not None:
-            end_at = world.top_time - preroll + outro
+        if end_at is None and (world.top_time is not None or world.game_over):
+            end_at = world.time + outro
         frame += 1
         if (end_at is not None and vt >= end_at) or vt >= max_len:
             break
@@ -351,14 +376,12 @@ def render_video(seed, out_path, fps=30, preroll=2.0, outro=4.0, max_len=75.0,
     saved_stills.append(final_still)
 
     duration = frame * dt
-    events = [type(e)(e.t - preroll, e.kind, e.tier, e.x, e.y, e.first)
-              for e in world.events if e.t >= preroll]
     wav = os.path.join(tmp, "audio.wav")
-    audio.write_wav(wav, audio.build_track(events, duration, voice_dir, with_voice=voice))
+    audio.write_wav(wav, audio.build_track(world.events, duration, voice_dir, with_voice=voice))
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", silent, "-i", wav, "-c:v", "copy",
                     "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart",
                     out_path], check=True)
     shutil.rmtree(tmp, ignore_errors=True)
-    top = world.top_time - preroll if world.top_time is not None else None
-    return {"duration": duration, "top_time": top, "score": world.score,
-            "merges": sum(e.kind == "merge" for e in events), "stills": saved_stills}
+    return {"duration": duration, "top_time": world.top_time, "score": world.score,
+            "drops": world.drops, "won": world.top_time is not None,
+            "merges": sum(e.kind == "merge" for e in world.events), "stills": saved_stills}
