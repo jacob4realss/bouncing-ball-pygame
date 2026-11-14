@@ -73,9 +73,9 @@ def voice_clip(ch, voice_dir):
     if custom:
         clip = _decode(custom)
     else:
-        src = os.path.join(voice_dir, f"tts_{_slug(VOICE)}_{_slug(ch.line)}.mp3")
+        src = os.path.join(voice_dir, f"tts_{_slug(VOICE)}_{_slug(ch.speech)}.mp3")
         if not os.path.exists(src) or os.path.getsize(src) == 0:
-            _speak(ch.line, src)
+            _speak(ch.speech, src)
         sr = _source_rate(src)
         p = ch.pitch
         tempo = min(2.0, max(0.5, p ** -0.55))   # big = slower and deeper

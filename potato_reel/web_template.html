@@ -626,9 +626,9 @@ function start(data) {
   const first = CH[0], last = CH[MAX - 1];
   $("start-title").textContent = last.line;
   $("win-title").textContent = last.line + " !";
-  $("start-text").innerHTML = `Touche l'écran pour lâcher une ${first.line.toLowerCase()}, garde le doigt appuyé pour en lâcher plein. ` +
+  $("start-text").innerHTML = `Touche l'écran pour lâcher une patate ${first.name}, garde le doigt appuyé pour en lâcher plein. ` +
     `<strong>Deux patates pareilles qui se touchent fusionnent</strong> en une plus grosse. ` +
-    `Fais naître ${last.line.toLowerCase()} sans déborder du cercle.`;
+    `Fais naître ${last.line} sans déborder du cercle.`;
   for (const c of CH) {
     const im = new Image(); im.src = c.sprite; im.alt = c.line;
     im.style.width = `calc(var(--u) * ${Math.round(40 + c.radius * 0.55)})`;

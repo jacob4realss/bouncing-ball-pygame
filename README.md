@@ -86,9 +86,9 @@ deeper the bigger the potato. You lose if the pile stays above the top of the ri
 | Size | Voice line |
 |---|---|
 | 1 (dropped) | La patate Mahrez |
-| 2 | La patate Warda |
-| 3 | La patate Mexique |
-| 4 | La patate Belahcen |
+| 2 | La patate Charlemonté |
+| 3 | Adel la patate Mexique |
+| 4 | La patate 1xBet |
 | 5 (the last one) | La patate Choucha |
 
 Each extra character doubles the potatoes needed: 5 characters make a ~20–35 s game,

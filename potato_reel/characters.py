@@ -17,11 +17,12 @@ HALF = 1.9      # sprite canvas half-size, in body radii (room for hats/horns)
 
 # (display name, skin RGB, style key)
 CAST = [
-    ("Mahrez",   (204, 152,  96), "mahrez"),
-    ("Warda",    (222, 172, 120), "warda"),
-    ("Mexique",  (196, 142,  84), "mexique"),
-    ("Belahcen", (190, 140,  90), "belahcen"),
-    ("Choucha",  (214, 160,  92), "choucha"),
+    # (short name, skin RGB, drawing style, voice line[, how the voice should read it])
+    ("Mahrez",      (204, 152,  96), "mahrez",   "La patate Mahrez"),
+    ("Charlemonté", (222, 172, 120), "warda",    "La patate Charlemonté"),
+    ("Mexique",     (196, 142,  84), "mexique",  "Adel la patate Mexique"),
+    ("1xBet",       (190, 140,  90), "belahcen", "La patate 1xBet", "La patate One X Bet"),
+    ("Choucha",     (214, 160,  92), "choucha",  "La patate Choucha"),
 ]
 # Each tier has about twice the area of the one before (radius x ~1.41).
 RADII = [46, 64, 90, 126, 176]
@@ -40,19 +41,20 @@ class Character:
     pitch: float     # voice pitch factor (>1 higher, <1 deeper)
     points: int      # score for creating one
     style: str
-
-    @property
-    def line(self) -> str:
-        return f"La patate {self.name}"
+    line: str        # what's shown and said, e.g. "La patate Mahrez"
+    speech: str      # how the voice reads it (spelled out where TTS needs help)
 
 
 def _build_cast():
     n = len(CAST)
     out = []
-    for i, (name, skin, style) in enumerate(CAST):
+    for i, entry in enumerate(CAST):
+        name, skin, style = entry[:3]
+        line = entry[3] if len(entry) > 3 else f"La patate {name}"
+        speech = entry[4] if len(entry) > 4 else line
         pitch = PITCH_SMALLEST * (PITCH_BIGGEST / PITCH_SMALLEST) ** (i / (n - 1))
         out.append(Character(i + 1, name, skin, RADII[i], round(pitch, 3),
-                             (i + 1) * (i + 2) // 2, style))
+                             (i + 1) * (i + 2) // 2, style, line, speech))
     return out
 
 
@@ -431,23 +433,33 @@ def _draw_warda(pen, back, clip, skin):
 
 
 def _draw_mexique(pen, back, clip, skin):
-    straw, straw_dk = (232, 196, 112, 255), (150, 112, 40, 255)
-    _eyes(pen, skin, rx=0.18, ry=0.2, y=-0.1, look=(-0.2, 0.0))
+    """Adel: short salt-and-pepper hair, a full white beard with a little black in it."""
+    grey, grey_dk = (150, 150, 152, 255), (90, 90, 94, 255)
+    white, white_dk = (238, 238, 234, 255), (160, 160, 158, 255)
+    rng = random.Random(41)
+    pen.chord(0, 0, 1.03, 1.04, 212, 328, fill=grey, outline=grey_dk, width=0.025)
+    for _ in range(30):                                     # pepper in the hair
+        a = math.radians(rng.uniform(215, 325)); d = rng.uniform(0.65, 0.98)
+        pen.circle(d * math.cos(a), d * math.sin(a), 0.025, fill=(60, 58, 60, 255))
+    _eyes(pen, skin, rx=0.18, ry=0.2, y=-0.12, look=(-0.2, 0.0))
     for side in (-1, 1):
-        _brow(pen, side * 0.31, -0.36, side, 0.24, -0.2, 0.065)
-    pen.chord(0, 0.22, 0.38, 0.32, 0, 180, fill=(80, 20, 22, 255), outline=INK, width=0.03)   # big grin
-    pen.chord(0, 0.22, 0.32, 0.12, 0, 180, fill=(255, 255, 255, 255))                         # teeth
-    _blush(clip, 90)
-    # sombrero, a nod to the nickname
-    pen.ellipse(0, -0.74, 1.5, 0.24, fill=straw, outline=straw_dk, width=0.03)
-    pen.chord(0, -0.78, 0.55, 0.62, 180, 360, fill=straw, outline=straw_dk, width=0.03)
-    pen.rrect(-0.53, -0.96, 0.53, -0.8, 0.03, fill=(206, 40, 50, 255))
-    for i, x in enumerate(np.linspace(-0.45, 0.45, 7)):
-        pen.poly([(x - 0.07, -0.88), (x, -0.95 if i % 2 else -0.81), (x + 0.07, -0.88)],
-                 fill=(0, 140, 70, 255) if i % 2 else (255, 255, 255, 255))
-    for x in np.linspace(-1.3, 1.3, 9):
-        pen.circle(x, -0.62 + 0.12 * (1 - (x / 1.3) ** 2) ** 0.5, 0.05,
-                   fill=[(230, 40, 60, 255), (0, 150, 80, 255), (250, 200, 40, 255)][int(abs(x) * 10) % 3])
+        _brow(pen, side * 0.31, -0.38, side, 0.24, -0.2, 0.065, (120, 120, 122, 255))
+    beard = [(-0.95, -0.05), (-0.86, 0.45), (-0.62, 0.86), (-0.3, 1.1), (0, 1.16), (0.3, 1.1),
+             (0.62, 0.86), (0.86, 0.45), (0.95, -0.05), (0.68, 0.16), (0.38, 0.2), (0, 0.16),
+             (-0.38, 0.2), (-0.68, 0.16)]
+    pen.poly(beard, fill=white, outline=white_dk, width=0.03)
+    for _ in range(26):                                     # a little black in the beard
+        x, y = rng.uniform(-0.7, 0.7), rng.uniform(0.3, 0.95)
+        if abs(x) < 0.85 - 0.6 * max(0, y - 0.5):
+            pen.line([(x, y), (x + rng.uniform(-0.04, 0.04), y + 0.09)], (50, 48, 50, 255), 0.022)
+    for x in (-0.45, -0.15, 0.15, 0.45):
+        pen.line([(x, 0.55), (x * 0.9, 0.9)], white_dk, 0.02)
+    pen.chord(0, 0.3, 0.3, 0.24, 0, 180, fill=(80, 20, 22, 255), outline=INK, width=0.03)      # big grin
+    pen.chord(0, 0.3, 0.25, 0.09, 0, 180, fill=(255, 255, 255, 255))                          # teeth
+    for side in (-1, 1):                                    # white moustache
+        pen.poly([(0, 0.24), (side * 0.22, 0.2), (side * 0.42, 0.28), (side * 0.4, 0.36), (side * 0.18, 0.3)],
+                 fill=white, outline=white_dk, width=0.02)
+    _blush(clip, 90, y=0.1)
 
 
 def _draw_belahcen(pen, back, clip, skin):
