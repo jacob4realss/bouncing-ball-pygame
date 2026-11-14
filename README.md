@@ -110,6 +110,11 @@ python -m potato_reel --stills 5,20         # also saves PNG frames at those sec
 ```
 Every seed is a different game, so render a few and post the best one.
 
+### Make a cover image
+```bash
+python -m potato_reel.thumbnail             # writes output/thumbnail.png (1080×1920)
+```
+
 ### Build the browser game
 ```bash
 python -m potato_reel.web                   # writes output/potato_game.html (open it in any browser)
