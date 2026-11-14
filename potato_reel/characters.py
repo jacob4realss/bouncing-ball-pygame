@@ -28,7 +28,7 @@ CAST = [
     ("Royale",  (222, 172,  84), "royale"),
 ]
 RADII = [34, 42, 52, 64, 79, 97, 119, 146, 180]
-PITCH_SMALLEST, PITCH_BIGGEST = 1.45, 0.58
+PITCH_SMALLEST, PITCH_BIGGEST = 1.3, 0.66    # Henri's voice is already low
 
 
 @dataclass(frozen=True)

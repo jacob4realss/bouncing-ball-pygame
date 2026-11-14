@@ -1,7 +1,10 @@
 """French voice lines ("La patate ...") + pop sounds, mixed onto the merge timeline.
 
-Voices come from Google Translate's French TTS (via gTTS) and are cached.
-Each tier is pitch-shifted with ffmpeg: small potatoes squeak, big ones rumble.
+Voices come from Microsoft's French neural voice "Henri" (male, via edge-tts),
+spoken with energy, and are cached. If that service can't be reached, Google's
+French TTS (gTTS) is used instead. Each tier is pitch-shifted with ffmpeg:
+small potatoes sound higher, big ones deeper. Set POTATO_VOICE to use another
+edge-tts voice (for example fr-FR-RemyMultilingualNeural).
 Drop your own recordings in the voice folder as `<tier>_<name>.wav`/`.mp3`
 (e.g. `9_Royale.mp3`) to use them instead of the generated ones.
 """
@@ -15,6 +18,23 @@ import numpy as np
 from .characters import CHARACTERS, MAX_TIER
 
 SR = 44100
+VOICE = os.environ.get("POTATO_VOICE", "fr-FR-HenriNeural")
+
+
+def _speak(text, path):
+    """Write an enthusiastic French reading of `text` to an mp3 at `path`."""
+    try:
+        import asyncio
+        import edge_tts
+        com = edge_tts.Communicate(text + " !", VOICE, rate="+12%", pitch="+4Hz",
+                                   proxy=os.environ.get("HTTPS_PROXY") or None)
+        asyncio.run(com.save(path))
+        if os.path.getsize(path) > 0:
+            return
+    except Exception as exc:          # offline, blocked or not installed
+        print(f"  edge-tts unavailable ({exc.__class__.__name__}); using gTTS")
+    from gtts import gTTS
+    gTTS(text, lang="fr").save(path)
 
 
 def _slug(text):
@@ -53,10 +73,9 @@ def voice_clip(ch, voice_dir):
     if custom:
         clip = _decode(custom)
     else:
-        src = os.path.join(voice_dir, f"tts_{_slug(ch.line)}.mp3")
-        if not os.path.exists(src):
-            from gtts import gTTS
-            gTTS(ch.line, lang="fr").save(src)
+        src = os.path.join(voice_dir, f"tts_{_slug(VOICE)}_{_slug(ch.line)}.mp3")
+        if not os.path.exists(src) or os.path.getsize(src) == 0:
+            _speak(ch.line, src)
         sr = _source_rate(src)
         p = ch.pitch
         tempo = min(2.0, max(0.5, p ** -0.55))   # big = slower and deeper
