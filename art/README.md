@@ -12,3 +12,6 @@ Put a picture here to replace a drawn character. Name it `<size>_<Name>.png`
 Use a transparent background (a PNG cut-out). The picture is fitted to the
 potato's circle, so a roughly round, head-only image works best. Then run
 `python -m potato_reel` and `python -m potato_reel.web` again.
+
+The current pictures were generated as 3D "potato head" renders on a plain grey
+background, then cut out with `python -m potato_reel.cutout <in> <out>`.

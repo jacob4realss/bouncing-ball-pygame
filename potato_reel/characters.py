@@ -556,7 +556,7 @@ def _art_sprite(path, r):
     if box:
         img = img.crop(box)
     size = int(2 * HALF * r)
-    scale = min(2.2 * r / img.width, 2 * HALF * r * 0.95 / img.height)
+    scale = 2.12 * r / max(img.width, img.height)       # the rounded picture fills the bounce circle
     img = img.resize((max(1, int(img.width * scale)), max(1, int(img.height * scale))), Image.LANCZOS)
     out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     out.alpha_composite(img, ((size - img.width) // 2, (size - img.height) // 2))
@@ -617,7 +617,7 @@ def character_sheet(path, cols=3):
     """Save a labelled poster of the whole cast."""
     from PIL import ImageFont
     from .assets import font_path
-    cell = 360
+    cell = 440
     rows = math.ceil(MAX_TIER / cols)
     sheet = Image.new("RGB", (cols * cell, rows * cell), (10, 10, 16))
     font = ImageFont.truetype(font_path(), 30) if font_path() else ImageFont.load_default()
