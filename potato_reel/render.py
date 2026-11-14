@@ -92,6 +92,15 @@ def build_background(arena):
     img.alpha_composite(glow)
     img.alpha_composite(glow)
     img.alpha_composite(ring)
+
+    # the tube that feeds the ring from the top of the screen
+    walls = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    dw = ImageDraw.Draw(walls)
+    for side in (-1, 1):
+        x = arena.cx + side * (arena.gap / 2 + 4)
+        dw.line([(x, 0), (x, pts[0][0][1] - 2)], fill=(240, 240, 246, 255), width=8)
+    img.alpha_composite(walls.filter(ImageFilter.GaussianBlur(9)))
+    img.alpha_composite(walls)
     return img
 
 

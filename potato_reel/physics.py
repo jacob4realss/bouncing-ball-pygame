@@ -20,7 +20,11 @@ class Arena:
     cx: float = 540.0
     cy: float = 1000.0
     R: float = 490.0          # inner radius of the ring
-    open_deg: float = 42.0    # half-angle of the opening at the top
+    gap: float = 164.0        # width of the tube that feeds the ring from the top
+
+    @property
+    def open_deg(self):       # half-angle of the ring's opening under the tube
+        return math.degrees(math.asin(self.gap / 2 / self.R))
 
     @property
     def corners(self):
@@ -32,31 +36,28 @@ class Arena:
     def rim_y(self):          # the "don't fill above this" line
         return self.corners[0][1]
 
-    @property
-    def drop_y(self):         # where the held potato hangs
-        return self.rim_y - 100
-
-    def aim_range(self, r):
-        (lx, _), (rx, _) = self.corners
-        return lx + r + 6, rx - r - 6
+    def aim_range(self, r):   # x positions a potato of radius r can drop at, inside the tube
+        return self.cx - self.gap / 2 + r + 3, self.cx + self.gap / 2 - r - 3
 
 
 @dataclass
 class Tuning:
-    gravity: float = 3200.0
-    restitution: float = 0.45    # bounciness of a hard hit
-    bounce_min: float = 140.0    # px/s: softer contacts don't bounce (keeps piles calm)
-    friction: float = 0.25
+    gravity: float = 1900.0
+    restitution: float = 0.9     # bounciness when two potatoes hit
+    wall_bounce: float = 0.98    # bounciness off the ring
+    min_rebound: float = 900.0   # px/s: the ring always kicks potatoes back this hard, so they never settle
+    bounce_min: float = 0.0      # px/s: contacts softer than this don't bounce
+    friction: float = 0.05
     air: float = 0.9996
     correction: float = 0.85
     iterations: int = 2
     merge_slop: float = 1.5      # px of gap that still counts as touching
     min_merge_age: float = 0.06
     grow_time: float = 0.14      # s for a merged potato to reach full size
-    drop_speed: float = 700.0    # px/s downward when a potato enters at the top
+    drop_speed: float = 900.0    # px/s downward when a potato enters the tube
     min_gap: float = 0.1         # s between two drops
     drop_rate: float = 1.0       # average drops per second for the auto-dropper
-    lose_time: float = 2.5       # s a potato may sit above the rim before game over
+    lose_time: float = 4.0       # s a potato may stay stuck in the tube before game over
 
 
 class Body:
@@ -110,7 +111,10 @@ class World:
     # ------------------------------------------------------------ player API
     @property
     def can_drop(self):
-        return not self.game_over and self.time >= self.ready_at
+        """The next potato waits until the tube is empty."""
+        if self.game_over or self.time < self.ready_at:
+            return False
+        return all(b.y - b.r > self.arena.rim_y for b in self.bodies)
 
     def drop(self, x, vx=0.0):
         """Drop the smallest potato from above the screen at x (clamped to the opening)."""
@@ -165,7 +169,7 @@ class World:
             if b.contact:
                 b.ang += 0.4 * b.vx / b.r * dt
             b.ang -= b.ang * 1.5 * dt
-            if b.age > 1.0 and b.y - b.r < rim:
+            if b.age > 1.5 and b.y < rim:          # stuck in the tube
                 b.over += dt
                 if b.over > t.lose_time and self.top_time is None:
                     self.game_over = True
@@ -247,11 +251,18 @@ class World:
                     b.x -= nx * pen; b.y -= ny * pen
                     vn = b.vx * nx + b.vy * ny
                     if vn > 0:
-                        e = t.restitution if vn > t.bounce_min else 0.0
-                        b.vx -= (1 + e) * vn * nx
-                        b.vy -= (1 + e) * vn * ny
-                        b.vx *= 0.985
+                        out = max(vn * t.wall_bounce, t.min_rebound)   # bounce back at least this fast
+                        b.vx -= (vn + out) * nx
+                        b.vy -= (vn + out) * ny
                     b.contact = True
+            if b.y < A.rim_y:                 # inside the tube: two straight walls
+                lo, hi = A.cx - A.gap / 2 + b.r, A.cx + A.gap / 2 - b.r
+                if lo > hi:
+                    b.x, b.vx = A.cx, 0.0
+                elif b.x < lo:
+                    b.x, b.vx = lo, abs(b.vx) * t.wall_bounce
+                elif b.x > hi:
+                    b.x, b.vx = hi, -abs(b.vx) * t.wall_bounce
             for (px, py) in A.corners:    # the two ends of the ring
                 ex, ey = b.x - px, b.y - py
                 e = math.hypot(ex, ey)
@@ -260,7 +271,6 @@ class World:
                     b.x += ux * (b.r - e); b.y += uy * (b.r - e)
                     vn = b.vx * ux + b.vy * uy
                     if vn < 0:
-                        e = t.restitution if -vn > t.bounce_min else 0.0
-                        b.vx -= (1 + e) * vn * ux
-                        b.vy -= (1 + e) * vn * uy
+                        b.vx -= (1 + t.wall_bounce) * vn * ux
+                        b.vy -= (1 + t.wall_bounce) * vn * uy
                     b.contact = True

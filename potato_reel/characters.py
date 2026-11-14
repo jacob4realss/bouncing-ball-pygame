@@ -6,7 +6,9 @@ drawing for each `style` lives in the `_draw_<style>` functions below.
 """
 import colorsys
 import math
+import os
 import random
+import unicodedata
 from dataclasses import dataclass
 
 import numpy as np
@@ -529,9 +531,44 @@ def _body_outline(rng, n=180):
     return pts
 
 
+# Picture files that replace the drawn characters: art/<tier>_<Name>.png (or .webp),
+# e.g. art/1_Mahrez.png. Use a transparent background (PNG with alpha).
+ART_DIR = os.environ.get("POTATO_ART", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "art"))
+
+
+def _slug(text):
+    s = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    return "".join(c if c.isalnum() else "_" for c in s).strip("_")
+
+
+def custom_art(ch):
+    for ext in (".png", ".webp"):
+        p = os.path.join(ART_DIR, f"{ch.tier}_{_slug(ch.name)}{ext}")
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def _art_sprite(path, r):
+    """Fit a transparent picture to the potato's circle on a standard sprite canvas."""
+    img = Image.open(path).convert("RGBA")
+    box = img.getchannel("A").getbbox()
+    if box:
+        img = img.crop(box)
+    size = int(2 * HALF * r)
+    scale = min(2.2 * r / img.width, 2 * HALF * r * 0.95 / img.height)
+    img = img.resize((max(1, int(img.width * scale)), max(1, int(img.height * scale))), Image.LANCZOS)
+    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    out.alpha_composite(img, ((size - img.width) // 2, (size - img.height) // 2))
+    return out
+
+
 def render_sprite(ch: Character, radius=None) -> Image.Image:
     """Return an RGBA sprite whose body centre is the image centre."""
     r = radius or ch.radius
+    art = custom_art(ch)
+    if art:
+        return _art_sprite(art, r)
     u = r * SS
     size = int(2 * HALF * u)
     c = size / 2

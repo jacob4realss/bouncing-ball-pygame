@@ -1,6 +1,6 @@
-"""Auto-dropper: Bébés rain in from the top at random spots and random times,
-the way a player tapping quickly would drop them. Nothing is aimed; whether
-two potatoes meet depends on how they bounce and roll."""
+"""Auto-dropper: the smallest potato comes down the tube at random times, the
+way a player tapping would drop them. Nothing is aimed; whether two potatoes
+meet depends on how they bounce around the ring."""
 import random
 
 from .characters import CHARACTERS
@@ -19,11 +19,8 @@ class Rain:
         if w.game_over or w.top_time is not None or w.time < self.next_t or not w.can_drop:
             return
         lo, hi = w.arena.aim_range(CHARACTERS[0].radius)
-        if self.rng.random() < 0.3:       # jump somewhere new
-            self.x = self.rng.uniform(lo, hi)
-        else:                             # or drift, like a finger moving across the screen
-            self.x = min(hi, max(lo, self.x + self.rng.gauss(0, 90)))
-        w.drop(self.x, vx=self.rng.gauss(0, 110))
+        self.x = self.rng.uniform(lo, hi)            # a little wobble inside the tube
+        w.drop(self.x, vx=self.rng.gauss(0, 60))
         gap = self.rng.expovariate(self.rate)
         if self.rng.random() < 0.08:      # the occasional pause
             gap += self.rng.uniform(0.4, 0.9)

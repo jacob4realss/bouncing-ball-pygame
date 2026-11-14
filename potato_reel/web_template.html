@@ -127,16 +127,18 @@ const MAX = CH.length;
 const HALF = DATA.half;
 
 // ------------------------------------------------------------------ arena + rules
-const A = { cx: 540, cy: 1000, R: 490, open: 42 * Math.PI / 180 };
+const A = { cx: 540, cy: 1000, R: 490, gap: 164 };   // ring fed by a tube from the top
+A.open = Math.asin(A.gap / 2 / A.R);
 A.corners = [[A.cx - A.R * Math.sin(A.open), A.cy - A.R * Math.cos(A.open)],
              [A.cx + A.R * Math.sin(A.open), A.cy - A.R * Math.cos(A.open)]];
 A.rimY = A.corners[0][1];
 A.dropY = A.rimY - 100;
-const T = { gravity: 3200, rest: 0.45, bounceMin: 140, fric: 0.25, air: 0.9996, corr: 0.85, iters: 2,
-            slop: 1.5, minAge: 0.06, grow: 0.14, dropSpeed: 700, minGap: 0.1, holdGap: 0.17, lose: 2.5 };
+const T = { gravity: 1900, rest: 0.9, bounceMin: 0, wallBounce: 0.98, minRebound: 900, fric: 0.05, air: 0.9996,
+            corr: 0.85, iters: 2, slop: 1.5, minAge: 0.06, grow: 0.14, dropSpeed: 900, minGap: 0.1, holdGap: 0.17,
+            lose: 4 };
 const STEP = 1 / 240;
 
-function aimRange(r) { return [A.corners[0][0] + r + 6, A.corners[1][0] - r - 6]; }
+function aimRange(r) { return [A.cx - A.gap / 2 + r + 3, A.cx + A.gap / 2 - r - 3]; }
 
 let S;  // game state
 function newGame() {
@@ -154,7 +156,8 @@ function makeBody(tier, x, y, vx = 0, vy = 0, r = null) {
   if (first) S.seen.push(tier);
   return [b, first];
 }
-function canDrop() { return !S.over && S.time >= S.readyAt; }
+// the next potato waits until the tube is empty
+function canDrop() { return !S.over && S.time >= S.readyAt && S.bodies.every(b => b.y - b.r > A.rimY); }
 // Only the smallest potato is ever dropped; it enters from above the screen.
 function drop(x, vx = 0) {
   if (!canDrop()) return false;
@@ -222,9 +225,15 @@ function bounds() {
       if (pen > 0) {
         b.x -= nx * pen; b.y -= ny * pen;
         const vn = b.vx * nx + b.vy * ny;
-        if (vn > 0) { const e = vn > T.bounceMin ? T.rest : 0; b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny; b.vx *= 0.985; }
+        if (vn > 0) { const out = Math.max(vn * T.wallBounce, T.minRebound); b.vx -= (vn + out) * nx; b.vy -= (vn + out) * ny; }
         b.contact = true;
       }
+    }
+    if (b.y < A.rimY) {                         // inside the tube
+      const lo = A.cx - A.gap / 2 + b.r, hi = A.cx + A.gap / 2 - b.r;
+      if (lo > hi) { b.x = A.cx; b.vx = 0; }
+      else if (b.x < lo) { b.x = lo; b.vx = Math.abs(b.vx) * T.wallBounce; }
+      else if (b.x > hi) { b.x = hi; b.vx = -Math.abs(b.vx) * T.wallBounce; }
     }
     for (const [px, py] of A.corners) {
       const ex = b.x - px, ey = b.y - py, e = Math.hypot(ex, ey);
@@ -232,7 +241,7 @@ function bounds() {
         const ux = ex / e, uy = ey / e;
         b.x += ux * (b.r - e); b.y += uy * (b.r - e);
         const vn = b.vx * ux + b.vy * uy;
-        if (vn < 0) { const e = -vn > T.bounceMin ? T.rest : 0; b.vx -= (1 + e) * vn * ux; b.vy -= (1 + e) * vn * uy; }
+        if (vn < 0) { b.vx -= (1 + T.wallBounce) * vn * ux; b.vy -= (1 + T.wallBounce) * vn * uy; }
         b.contact = true;
       }
     }
@@ -254,7 +263,7 @@ function step(dt) {
   for (const b of S.bodies) {
     if (b.contact) b.ang += 0.4 * b.vx / b.r * dt;
     b.ang -= b.ang * 1.5 * dt;
-    if (b.age > 1.0 && b.y - b.r < A.rimY) {
+    if (b.age > 1.5 && b.y < A.rimY) {          // stuck in the tube
       b.over += dt;
       worst = Math.max(worst, b.over);
       if (b.over > T.lose) S.over = true;
@@ -271,9 +280,7 @@ const rain = {
   update() {
     if (S.over || S.won || S.time < this.nextT || !canDrop()) return;
     const [lo, hi] = aimRange(CH[0].radius);
-    if (Math.random() < 0.3) this.x = lo + Math.random() * (hi - lo);
-    else this.x = Math.max(lo, Math.min(hi, this.x + gauss() * 90));
-    drop(this.x, gauss() * 110);
+    drop(lo + Math.random() * (hi - lo), gauss() * 60);
     let gap = -Math.log(1 - Math.random()) / this.rate;
     if (Math.random() < 0.08) gap += 0.4 + Math.random() * 0.5;
     this.nextT = S.time + Math.max(T.minGap, gap);
@@ -403,6 +410,17 @@ function buildBackground() {
       // canvas angles: 0 = +x, clockwise. Our th is measured from the top, counter-clockwise.
       g.arc(A.cx, A.cy, Rr, -Math.PI / 2 - th0, -Math.PI / 2 - th1, true);
       g.stroke();
+    }
+  }
+  g.shadowBlur = 0;
+  // the tube coming down from the top
+  const y1 = A.cy - Rr * Math.cos(A.open) - 2;
+  g.strokeStyle = "#f0f0f6"; g.lineWidth = 8; g.lineCap = "butt";
+  for (const pass of [0, 1]) {
+    g.shadowColor = "rgba(255,255,255,0.7)"; g.shadowBlur = pass === 0 ? 18 : 0;
+    for (const side of [-1, 1]) {
+      const x = A.cx + side * (A.gap / 2 + 4);
+      g.beginPath(); g.moveTo(x, 0); g.lineTo(x, y1); g.stroke();
     }
   }
   g.shadowBlur = 0;
@@ -558,14 +576,14 @@ function toLogical(ev) { const r = canvas.getBoundingClientRect(); return (ev.cl
 canvas.addEventListener("pointerdown", ev => {
   sound.init();
   if (mode !== "play" || auto) return;
-  pressing = true; aim = toLogical(ev);
-  drop(aim, gauss() * 40);
+  pressing = true; aim = A.cx + (Math.random() - 0.5) * 40;
+  drop(aim, gauss() * 60);
   holdNext = S.time + T.holdGap * 1.6;
   canvas.setPointerCapture && canvas.setPointerCapture(ev.pointerId);
 });
 canvas.addEventListener("pointermove", ev => {
   if (mode !== "play" || auto) return;
-  if (pressing) aim = toLogical(ev);
+  /* potatoes always come down the tube; the finger position doesn't matter */
 });
 canvas.addEventListener("pointerup", ev => {
   if (!pressing) return;
@@ -598,7 +616,7 @@ function frame(ts) {
   last = ts; clock += dt;
   if (mode === "play" || mode === "start") {
     if (auto && mode === "play") rain.update();
-    if (pressing && !auto && mode === "play" && S.time >= holdNext) { if (drop(aim, gauss() * 40)) holdNext = S.time + T.holdGap; }
+    if (pressing && !auto && mode === "play" && S.time >= holdNext) { if (drop(A.cx + (Math.random() - 0.5) * 40, gauss() * 60)) holdNext = S.time + T.holdGap; }
     acc += dt;
     while (acc >= STEP) { step(STEP); acc -= STEP; }
     if (S.over && overAt == null) overAt = clock + 0.7;
@@ -626,7 +644,7 @@ function start(data) {
   const first = CH[0], last = CH[MAX - 1];
   $("start-title").textContent = last.line;
   $("win-title").textContent = last.line + " !";
-  $("start-text").innerHTML = `Touche l'écran pour lâcher une patate ${first.name}, garde le doigt appuyé pour en lâcher plein. ` +
+  $("start-text").innerHTML = `Touche l'écran pour envoyer une patate ${first.name} dans le tube, garde le doigt appuyé pour en envoyer plein. ` +
     `<strong>Deux patates pareilles qui se touchent fusionnent</strong> en une plus grosse. ` +
     `Fais naître ${last.line} sans déborder du cercle.`;
   for (const c of CH) {
