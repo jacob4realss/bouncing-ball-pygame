@@ -70,7 +70,7 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 
 > **Note**: This implementation is for educational and entertainment purposes. The game logic and physics are simplified for demonstration purposes.
 
-## 🥔 La Patate Royale: merge game + reel maker (`potato_reel/`)
+## 🥔 La Patate Choucha: merge game + reel maker (`potato_reel/`)
 
 A potato merge game in two forms:
 
@@ -104,7 +104,7 @@ Each extra character doubles the potatoes needed: 5 characters make a ~20–35 s
 python -m potato_reel                       # picks a game that reaches the last potato in 22–40s
 python -m potato_reel --seed 13 --out output/reel_13.mp4
 python -m potato_reel --min-len 45 --max-len 60
-python -m potato_reel --hook "Wait for the last potato" --teaser "NOUVEAU : La patate Royale"
+python -m potato_reel --hook "Wait for the last potato" --teaser "NOUVEAU : La patate Choucha"
 python -m potato_reel --characters          # saves output/characters.png (the whole cast)
 python -m potato_reel --stills 5,20         # also saves PNG frames at those seconds
 ```
