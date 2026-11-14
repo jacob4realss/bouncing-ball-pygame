@@ -126,15 +126,15 @@ def build_track(events, duration, voice_dir, with_voice=True):
     pops = {ch.tier: pop_sound(ch.tier) for ch in CHARACTERS}
     last_t, last_tier, last_len = -9.0, 0, 0.0
     plop = drop_sound()
-    announced = False
+    last_drop_voice = -9.0
     for e in events:
         if e.kind == "drop":
             add(plop, e.t, 0.18)
-            if with_voice and not announced:     # name the dropped potato once, at the start
-                clip = voices[1]
-                add(clip, e.t + 0.1, 1.0)
-                announced = True
-                last_t, last_tier, last_len = e.t, 1, len(clip) / SR
+            # every drop names the dropped potato ("La patate Mahrez"), unless the
+            # previous drop's line only just started (a fast stream of drops)
+            if with_voice and e.t - last_drop_voice >= 0.45:
+                add(voices[1], e.t + 0.05, 0.9)
+                last_drop_voice = e.t
             continue
         if e.kind != "merge":
             continue

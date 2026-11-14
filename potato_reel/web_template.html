@@ -338,6 +338,16 @@ const sound = {
     this.tone(f0 * 1.7, f0, dur, 0.22 + 0.02 * tier);
     if (tier >= 6) this.tone(70, 45, 0.5, 0.35);
   },
+  // every drop names the dropped potato, unless the previous drop's line only just started
+  dropVoice() {
+    if (!this.ctx || !this.voices[1]) return;
+    const now = this.ctx.currentTime;
+    if (now - (this.lastDrop || -9) < 0.45) return;
+    const src = this.ctx.createBufferSource(), g = this.ctx.createGain();
+    src.buffer = this.voices[1]; g.gain.value = 0.9;
+    src.connect(g).connect(this.master); src.start();
+    this.lastDrop = now;
+  },
   voice(tier) {
     if (!this.ctx || !this.voices[tier]) return;
     const now = this.ctx.currentTime;
@@ -535,7 +545,7 @@ function render() {
 // ------------------------------------------------------------------ events + flow
 function onEvent(e) {
   if (!revealed.has(e.tier)) revealed.set(e.tier, clock);
-  if (e.kind === "drop") { sound.plop(); if (S.drops === 1) sound.voice(1); return; }
+  if (e.kind === "drop") { sound.plop(); sound.dropVoice(); return; }
   fx.burst(e.x, e.y, e.tier, e.first);
   scorePop = 1;
   sound.pop(e.tier);
