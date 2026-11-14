@@ -69,3 +69,38 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 ---
 
 > **Note**: This implementation is for educational and entertainment purposes. The game logic and physics are simplified for demonstration purposes.
+
+## 🥔 Potato Merge Reels (`potato_reel/`)
+
+A second tool in this repo that **renders vertical (1080×1920) merge-game reels**.
+Potatoes drop through a funnel into a glowing rainbow ring, and when two of the same
+kind touch they merge into the next, bigger character. Every merge triggers a French
+voice line, **« La patate … »**, pitched deeper the bigger the potato. The reel ends
+a few seconds after the final potato appears.
+
+| Tier | Voice line | Tier | Voice line | Tier | Voice line |
+|---|---|---|---|---|---|
+| 1 | La patate Bébé | 4 | La patate Chef | 7 | La patate Ninja |
+| 2 | La patate Douce | 5 | La patate Mamie | 8 | La patate Viking |
+| 3 | La patate Pirate | 6 | La patate Rappeur | 9 | La patate Royale |
+
+### Requirements
+- Python 3.9+ and `ffmpeg` on your PATH
+- `pip install -r requirements.txt`
+- Internet access the first time (voice lines come from Google's French TTS and are cached in `output/voices/`)
+
+### Make a reel
+```bash
+python -m potato_reel                       # picks a seed so the last potato lands at 35–52s
+python -m potato_reel --seed 7 --out output/reel_7.mp4
+python -m potato_reel --hook "Wait for the last potato" --teaser "NOUVEAU : La patate Royale"
+python -m potato_reel --characters          # saves output/characters.png (the whole cast)
+python -m potato_reel --stills 5,20         # also saves PNG frames at those seconds
+```
+Each seed plays out differently, so render a few and post the best one.
+
+### Customising
+- **Characters:** edit `CAST` in `potato_reel/characters.py` (name, skin colour, drawing style).
+- **Your own voice:** put recordings in `output/voices/` named `<tier>_<Name>.mp3` or `.wav`
+  (for example `9_Royale.mp3`, `1_Bebe.wav`; accents dropped from the file name). They replace the generated lines.
+- **Pacing:** `Tuning` in `potato_reel/physics.py` (drop speed, gravity, how often drops match).
